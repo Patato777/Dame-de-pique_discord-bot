@@ -142,5 +142,5 @@ async def on_message(msg):
     elif msg.content.startswith('!') and msg.content[1:] in COMMANDS:
         await COMMANDS[msg.content[1:]](msg.channel)
 
-
-bot.run('ODQyMDQ0MDM3MzM4NDk3MDI0.YJvkng.EBAtKuRMiGl2U3XcNkUFryRvRmA')
+token = input('Token : ')
+bot.run(token)
