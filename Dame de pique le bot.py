@@ -92,7 +92,7 @@ async def ddp(chan):
         return str(reaction.emoji) in ('❌', '♠') and user != bot.user
 
     timeout = False
-    while s_count < 1 and reaction.emoji != '❌' and not timeout:
+    while s_count < 4 and reaction.emoji != '❌' and not timeout:
         try:
             reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
         except asyncio.TimeoutError:
@@ -107,7 +107,7 @@ async def ddp(chan):
                 embed.description = 'Annulation...'
                 await msg.edit(embed=embed)
     await msg.clear_reactions()
-    if s_count == 1:
+    if s_count == 4:
         desc = f'Joueuses et joueurs : {", ".join([p.mention for p in players])}'
         embed = discord.Embed(title="C'est parti !", description=desc)
         await chan.send(embed=embed)
