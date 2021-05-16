@@ -29,6 +29,13 @@ class Player:
     def play(self, card):
         return self.cards.pop(card)
 
+    def swap(self):
+        return [self.play(int(input(f'Carte n°{k + 1} à donner'))) for k in range(3)]
+
+    def my_turn(self, trump, first, heart):
+        print(self.name)
+        return input(my_cards + '\n' + f'(plus petit que {len(self.cards)})' + prompt)
+
     async def give(self, player, cards):
         cards = [self.cards[c] for c in cards]
         for card in cards:
@@ -39,10 +46,6 @@ class Player:
 
     def say(self, string):
         print(string)
-
-    def ask(self, prompt, count=1, cond=lambda c: True):
-        print(self.name)
-        return input(my_cards + '\n' + f'(plus petit que {len(self.cards)})' + prompt)
 
 
 class DameDePique:
@@ -103,7 +106,7 @@ class DameDePique:
         self.players = [self.players[k % 4] for k in range(first, first + 4)]
 
     async def swap_cards(self, mod):
-        give = await self.ask_everyone('3 cartes à échanger avec son voisin', count=3)
+        give = [await player.swap() for player in self.players]
         for p, player in enumerate(self.players):
             await player.give(self.players[(p + self.r_corresp[mod]) % 4], give[p])
         await self.tell_everyone('Les cartes ont été échangées')
@@ -112,17 +115,13 @@ class DameDePique:
 
     async def player_turn(self, player, fold):
         trump = fold[0].color
-        play = await player.ask('A toi de jouer : ', count=1,
-                                cond=lambda c: player.cards[c].color != trump and trump in [card.color for card in
-                                                                                            player.cards])[0]
+        play = await player.my_turn(trump, False, self.heart)
         fold.append(player.play(play))
         await player.my_cards()
-        await self.add_to_everyone(f'{player.name} a joué : {fold[-1]}')
         return fold
 
     async def first_player_turn(self):
-        play = awaitself.players[0].ask('Tu commences : ', count=1,
-                                        cond=lambda c: self.players[0].cards[c].color == 'Coeur' and not self.heart)[0]
+        play = await self.players[0].my_turn(None, True, self.heart)
         card = self.players[0].play(play)
         await self.add_to_everyone(f'{self.players[0].name} a joué : {card}')
         return card
