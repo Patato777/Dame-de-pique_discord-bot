@@ -6,9 +6,6 @@ import dame_de_pique
 
 bot = discord.Client()
 
-COUNT = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
-COUNT_TRAD = {emoji: e for e, emoji in enumerate(COUNT)}
-
 
 class Player(dame_de_pique.Player):
     def __init__(self, user, chan):
@@ -69,7 +66,8 @@ class DameDePique(dame_de_pique.DameDePique):
         self.everyone = await self.chan.send(embed=embed)
 
     async def ask_everyone(self, prompt, count=3):
-        embed = discord.Embed(title=prompt, description=f'{", ".join([player.user.mention for player in self.players])}')
+        embed = discord.Embed(title=prompt,
+                              description=f'{", ".join([player.user.mention for player in self.players])}')
         msg = await self.chan.send(embed=embed)
         for player in self.players:
             await player.ask(prompt, count=3, base_msg=msg)
@@ -125,7 +123,15 @@ async def man(chan):
     await chan.send(embed=embed)
 
 
-COMMANDS = {'man': man, 'ddp': ddp}
+async def repeat(chan):
+    def check(m):
+        return m.channel == chan
+
+    msg = await bot.wait_for('message', check=check)
+    print(msg.content)
+
+
+COMMANDS = {'man': man, 'ddp': ddp, 'repeat': repeat}
 
 
 # @bot.event
@@ -141,6 +147,7 @@ async def on_message(msg):
             await msg.channel.send('Plaît-il ?')
     elif msg.content.startswith('!') and msg.content[1:] in COMMANDS:
         await COMMANDS[msg.content[1:]](msg.channel)
+
 
 token = input('Token : ')
 bot.run(token)
