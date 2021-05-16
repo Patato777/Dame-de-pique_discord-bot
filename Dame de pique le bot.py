@@ -1,10 +1,19 @@
 import asyncio
+import re
 
 import discord
+import emoji
 
 import dame_de_pique
 
 bot = discord.Client()
+
+
+def get_emojis(m):
+    custom = re.findall(r'<(?P<name>:\w*:)(?P<id>\d*)', m.content)
+    unicode = list(map(lambda e: (emoji.UNICODE_EMOJI_ENGLISH[e], ''),
+                       filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH.keys(), m.content)))
+    return custom + unicode
 
 
 class Player(dame_de_pique.Player):
@@ -30,26 +39,23 @@ class Player(dame_de_pique.Player):
         embed = discord.Embed(title=title, description=string)
         return await self.user.send(embed=embed)
 
-    async def ask(self, prompt, count=1, cond=lambda c: True, base_msg=None):
-        if base_msg is None:
-            await self.say(self.user.mention, title=prompt)
+    async def my_turn(self, trump, first, heart):
+        cards_list = [card.__repr__() for card in self.cards]
 
         def check(m):
-            try:
-                ans = set([int(n) - 1 for n in m.content.split(', ')])
-            except ValueError:
-                return False
-            return m.author == self.user and len(ans) == count and all(
-                [c in range(len(self.cards)) for c in ans]) and all([cond(self.cards[c]) for c in ans])
+            emojis = get_emojis(m)
+            if m.author == self.user and len(emojis) == 1 and CARDS[emojis[0][1:-1]] in cards_list:
+                card = self.cards[cards_list.index(emojis[0])]
+                if first and (card.color != 'Coeur' or heart):
+                    return True
+                elif card.color == trump or trump not in [c.color for c in self.cards]:
+                    return True
+            m.delete()
+            return False
 
         msg = await bot.wait_for('message', check=check)
-        content = msg.content
-        if base_msg is not None:
-            embed = base_msg.embeds[0]
-            embed.description = embed.description.replace(self.user.mention, '').replace(', ,', '')
-            await base_msg.edit(embed=embed)
-        await msg.delete()
-        return list(set([int(n) - 1 for n in content.split(', ')]))
+        await msg.add_reaction('✅')
+        return self.cards[cards_list.index(get_emojis(msg)[0])]
 
 
 class DameDePique(dame_de_pique.DameDePique):
@@ -64,13 +70,6 @@ class DameDePique(dame_de_pique.DameDePique):
     async def tell_everyone(self, string):
         embed = discord.Embed(title='Dame de pique', description=string)
         self.everyone = await self.chan.send(embed=embed)
-
-    async def ask_everyone(self, prompt, count=3):
-        embed = discord.Embed(title=prompt,
-                              description=f'{", ".join([player.user.mention for player in self.players])}')
-        msg = await self.chan.send(embed=embed)
-        for player in self.players:
-            await player.ask(prompt, count=3, base_msg=msg)
 
     async def add_to_everyone(self, string):
         self.everyone.embeds[0].description += f'\n{string}'
@@ -128,7 +127,7 @@ async def repeat(chan):
         return m.channel == chan
 
     msg = await bot.wait_for('message', check=check)
-    print(msg.content)
+    print(get_emojis(msg))
 
 
 COMMANDS = {'man': man, 'ddp': ddp, 'repeat': repeat}
