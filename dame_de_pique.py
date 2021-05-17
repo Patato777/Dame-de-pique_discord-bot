@@ -136,10 +136,12 @@ class DameDePique:
             fold = [self.players[0].play(de_2_trefle)]
             await self.autoplay(self.players[0], '2 de Trèfle')
         else:
+            await self.tell_everyone(f'A {self.players[0].name} de jouer')
             fold = [await self.first_player_turn()]
         await self.players[0].my_cards()
         trump = fold[0].color
         for player in self.players[1:]:
+            await self.tell_everyone(f'A {player.name} de jouer')
             fold = await self.player_turn(player, fold)
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
