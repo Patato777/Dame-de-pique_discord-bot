@@ -20,7 +20,7 @@ REACTIONS_CARDS = {value: key for key, value in {**CARDS_REACTIONS, **CARDS_DEF_
 def get_emojis(m):
     custom = re.findall(r'<(?P<name>:\w*:)(?P<id>\d*)', m.content)
     unicode = list(map(lambda e: (emoji.UNICODE_EMOJI_ENGLISH[e], ''),
-                       filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH.keys(), m.content)))
+                       filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH.keys(), list(m.content))))
     return custom + unicode
 
 
@@ -64,27 +64,28 @@ class Player(dame_de_pique.Player):
             emote = reaction.emoji.name if reaction.custom_emoji else reaction.emoji
             swap.append(cards_list.index(REACTIONS_CARDS[emote]))
         await msg.delete()
-        everyone.embeds[0].description = everyone.embeds[0].description.replace(self.name, '')
-        await everyone.edit(embed=everyone.embeds[0])
+        embed = everyone.embeds[0]
+        embed.description = embed.description.replace(self.name + ', ', '').replace(self.name, '')
+        await everyone.edit(embed=embed)
         return swap
 
     async def my_turn(self, trump, first, heart):
         cards_list = [card.__repr__() for card in self.cards]
 
-        def check(m):
+        async def check(m):
             emojis = get_emojis(m)
-            if m.author == self.user and len(emojis) == 1 and CARDS[emojis[0][1:-1]] in cards_list:
+            if m.author == self.user and len(emojis) == 1 and REACTIONS_CARDS[emojis[0][1:-1]] in cards_list:
                 card = self.cards[cards_list.index(emojis[0])]
                 if first and (card.color != 'Coeur' or heart):
                     return True
                 elif card.color == trump or trump not in [c.color for c in self.cards]:
                     return True
-            m.delete()
+            await m.delete()
             return False
 
-        msg = await bot.wait_for('message', check=check)
+        msg = await bot.wait_for('message', check=await check)
         await msg.add_reaction('✅')
-        return self.cards[cards_list.index(get_emojis(msg)[0])]
+        return cards_list.index(REACTIONS_CARDS[get_emojis(msg)[0][0][1:-1]])
 
 
 class DameDePique(dame_de_pique.DameDePique):
@@ -118,8 +119,9 @@ class DameDePique(dame_de_pique.DameDePique):
         self.everyone = await self.chan.send(embed=embed)
 
     async def autoplay(self, player, card):
-        emote = ':' + CARDS_REACTIONS[card] + ':' if card in REACTIONS_CARDS else CARDS_DEF_REACTIONS
-        embed = discord.Embed(title=player.name, description=emote)
+        emote = discord.utils.get(self.chan.guild.emojis, name=CARDS_REACTIONS[card]) if card in CARDS_REACTIONS else \
+        CARDS_DEF_REACTIONS[card]
+        embed = discord.Embed(title=player.user.name, description=emote)
         await self.chan.send(embed=embed)
 
     async def end(self):
