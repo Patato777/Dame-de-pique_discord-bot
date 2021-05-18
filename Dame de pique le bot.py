@@ -35,7 +35,7 @@ class Player(dame_de_pique.Player):
 
     async def my_cards(self):
         self.cards.sort()
-        hand = '\n'.join([f'{c + 1}. {card}' for c, card in enumerate(self.cards)])
+        hand = '\n'.join([f'{self.emotes[card]} : {card}' for c, card in enumerate(self.cards)])
         self.cards_msg.embeds[0].description = hand
         await self.cards_msg.edit(embed=self.cards_msg.embeds[0])
 
@@ -43,26 +43,30 @@ class Player(dame_de_pique.Player):
         embed = discord.Embed(title=title, description=string)
         return await self.chan.send(embed=embed)
 
-    async def swap(self, everyone):
+    async def ask_swap(self):
         embed = discord.Embed(title='Échanger des cartes', description='Choisissez 3 cartes à échanger')
         msg = await self.private_chan.send(embed=embed)
-        cards_list = [card.__repr__() for card in self.cards]
         for card in self.cards:
-            if card.__repr__() in CARDS_REACTIONS:
-                name = CARDS_REACTIONS[card.__repr__()]
-                emote = discord.utils.get(self.chan.guild.emojis, name=name)
+            if card.__repr__() in self.emotes:
+                emote = self.emotes[card.__repr__()]
             else:
                 emote = CARDS_DEF_REACTIONS[card.__repr__()]
             await msg.add_reaction(emote)
+        return msg
 
+    async def swap(self, everyone, msg):
         def check(r, u):
-            return u == self.user and r.count == 2
+            return r.message == msg and u == self.user and r.count == 2
 
         swap = list()
+        cards_list = [card.__repr__() for card in self.cards]
         while len(swap) < 3:
             reaction, _ = await bot.wait_for('reaction_add', check=check)
-            emote = reaction.emoji.name if reaction.custom_emoji else reaction.emoji
-            swap.append(cards_list.index(REACTIONS_CARDS[emote]))
+            swap = list()
+            for reaction in msg.reactions:
+                if reaction.count == 2:
+                    emote = reaction.emoji.name if reaction.custom_emoji else reaction.emoji
+                    swap.append(cards_list.index(REACTIONS_CARDS[emote]))
         await msg.delete()
         embed = everyone.embeds[0]
         embed.description = embed.description.replace(self.name + ', ', '').replace(self.name, '')
@@ -77,6 +81,7 @@ class Player(dame_de_pique.Player):
             if m.author == self.user and len(emojis) == 1 and REACTIONS_CARDS[emojis[0][1:-1]] in cards_list:
                 card = self.cards[cards_list.index(emojis[0])]
                 if first and (card.color != 'Coeur' or heart):
+
                     return True
                 elif card.color == trump or trump not in [c.color for c in self.cards]:
                     return True
@@ -97,6 +102,9 @@ class DameDePique(dame_de_pique.DameDePique):
         self.heart = False
         self.round = 0
         self.everyone = str()
+        self.emotes = {name: discord.utils.get(self.guild.emojis, name=card) for name, card in CARDS_REACTIONS}
+        for player in self.players:
+            player.emotes = self.emotes
 
     async def setup(self):
         category = await self.guild.create_category('Ma main')
@@ -114,13 +122,15 @@ class DameDePique(dame_de_pique.DameDePique):
             embed = discord.Embed(title='Mes cartes', description='')
             player.cards_msg = await player.private_chan.send(embed=embed)
 
+    async def say(self, string):
+        await self.chan.send(string)
+
     async def tell_everyone(self, string, title='Dame de pique'):
         embed = discord.Embed(title=title, description=string)
         self.everyone = await self.chan.send(embed=embed)
 
     async def autoplay(self, player, card):
-        emote = discord.utils.get(self.chan.guild.emojis, name=CARDS_REACTIONS[card]) if card in CARDS_REACTIONS else \
-        CARDS_DEF_REACTIONS[card]
+        emote = self.emotes[card] if card in self.emotes else CARDS_DEF_REACTIONS[card]
         embed = discord.Embed(title=player.user.name, description=emote)
         await self.chan.send(embed=embed)
 
@@ -141,8 +151,8 @@ async def ddp(chan):
     s_count, players = 0, list()
     reaction = discord.Reaction(message=None, data={}, emoji=True)
 
-    def check(reac, u):
-        return str(reac.emoji) in ('❌', '♠') and u != bot.user
+    def check(r, u):
+        return r.message == msg and str(r.emoji) in ('❌', '♠') and u != bot.user
 
     timeout = False
     while s_count < 4 and reaction.emoji != '❌' and not timeout:
@@ -183,6 +193,7 @@ async def repeat(chan):
 
     msg = await bot.wait_for('message', check=check)
     print(get_emojis(msg))
+
 
 async def regles(chan):
     with open('files/regles.txt', 'r', encoding='utf-8') as f:

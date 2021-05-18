@@ -29,7 +29,7 @@ class Player:
     def play(self, card):
         return self.cards.pop(card)
 
-    def swap(self, everyone):
+    def swap(self, everyone, _):
         return [self.play(int(input(f'Carte n°{k + 1} à donner'))) for k in range(3)]
 
     def my_turn(self, trump, first, heart):
@@ -57,6 +57,9 @@ class DameDePique:
         self.heart = False
         self.round = 0
         self.everyone = str()
+
+    async def say(self, string):
+        print(string)
 
     def tell_everyone(self, string, title='Dame de Pique'):
         print(string)
@@ -111,7 +114,8 @@ class DameDePique:
 
     async def swap_cards(self, mod):
         await self.tell_everyone(', '.join([player.name for player in self.players]), 'Échangez vos cartes')
-        give = [await player.swap(self.everyone) for player in self.players]
+        swaps = [await player.ask_swap() for player in self.players]
+        give = [await player.swap(self.everyone, swap) for player, swap in zip(self.players, swaps)]
         for p, player in enumerate(self.players):
             await player.give(self.players[(p + self.r_corresp[mod]) % 4], give[p])
         for player in self.players:
@@ -136,12 +140,12 @@ class DameDePique:
             fold = [self.players[0].play(de_2_trefle)]
             await self.autoplay(self.players[0], '2 de Trèfle')
         else:
-            await self.tell_everyone(f'A {self.players[0].name} de jouer')
+            await self.say(f'A {self.players[0].name} de jouer')
             fold = [await self.first_player_turn()]
         await self.players[0].my_cards()
         trump = fold[0].color
         for player in self.players[1:]:
-            await self.tell_everyone(f'A {player.name} de jouer')
+            await self.say(f'A {player.name} de jouer')
             fold = await self.player_turn(player, fold)
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
