@@ -184,8 +184,15 @@ async def repeat(chan):
     msg = await bot.wait_for('message', check=check)
     print(get_emojis(msg))
 
+async def regles(chan):
+    with open('files/regles.txt', 'r', encoding='utf-8') as f:
+        title = f.readline()
+        text = f.read()
+    embed = discord.Embed(type='rich', title=title, description=text)
+    await chan.send(embed=embed)
 
-COMMANDS = {'man': man, 'ddp': ddp, 'repeat': repeat}
+
+COMMANDS = {'man': man, 'ddp': ddp, 'repeat': repeat, 'règles': regles}
 
 
 # @bot.event
