@@ -1,7 +1,4 @@
 Manuel
 Bienvenue sur le manuel de **Dame de pique**
 
-**Commandes**
-`!man` : afficher cette page
-`!ddp` : commencer une partie de __Dame de Pique__
-`!règles` : afficher les règles de la __Dame de Pique__
+...il est vide
