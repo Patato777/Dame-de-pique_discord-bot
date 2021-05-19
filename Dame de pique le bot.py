@@ -212,8 +212,13 @@ async def test(chan):
     def check(m):
         return m.channel == chan
 
-    msg = await bot.wait_for('message', check=check)
-    print(get_emojis(msg))
+    msg = await chan.send('Foo')
+    await msg.add_reaction('<:Kappa:673530124259426304>')
+    r, _ = await bot.wait_for('reaction_add')
+    print(r.message.reactions == msg.reactions)
+    for _ in range(50):
+        await asyncio.sleep(1)
+        print(msg.reactions)
 
 
 async def regles(chan):
