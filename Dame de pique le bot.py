@@ -35,7 +35,7 @@ class Player(dame_de_pique.Player):
 
     async def my_cards(self):
         self.cards.sort()
-        hand = '\n'.join([f'{self.emotes[card]} : {card}' for c, card in enumerate(self.cards)])
+        hand = '\n'.join([f'{self.emotes[card.__repr__()]} : {card}' for c, card in enumerate(self.cards)])
         self.cards_msg.embeds[0].description = hand
         await self.cards_msg.edit(embed=self.cards_msg.embeds[0])
 
@@ -102,7 +102,8 @@ class DameDePique(dame_de_pique.DameDePique):
         self.heart = False
         self.round = 0
         self.everyone = str()
-        self.emotes = {name: discord.utils.get(self.guild.emojis, name=card) for name, card in CARDS_REACTIONS}
+        c_emotes = {name: discord.utils.get(self.guild.emojis, name=card) for name, card in CARDS_REACTIONS.items()}
+        self.emotes = {**c_emotes, **CARDS_DEF_REACTIONS}
         for player in self.players:
             player.emotes = self.emotes
 
@@ -187,7 +188,7 @@ async def man(chan):
     await chan.send(embed=embed)
 
 
-async def repeat(chan):
+async def test(chan):
     def check(m):
         return m.channel == chan
 
@@ -203,7 +204,7 @@ async def regles(chan):
     await chan.send(embed=embed)
 
 
-COMMANDS = {'man': man, 'ddp': ddp, 'repeat': repeat, 'règles': regles}
+COMMANDS = {'man': man, 'ddp': ddp, 'test': test, 'règles': regles}
 
 
 # @bot.event
