@@ -227,10 +227,6 @@ async def regles(chan):
 COMMANDS = {'man': man, 'ddp': ddp, 'test': test, 'règles': regles}
 
 
-# @bot.event
-# async def on_ready():
-#    await bot.get_channel(841820253008166912).send('Bonjour ! :wave: :blush:')
-
 @bot.event
 async def on_message(msg):
     if bot.user in msg.mentions:
