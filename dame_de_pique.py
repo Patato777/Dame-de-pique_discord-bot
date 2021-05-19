@@ -29,7 +29,7 @@ class Player:
     def play(self, card):
         return self.cards.pop(card)
 
-    def swap(self, everyone, _):
+    def swap(self, _):
         return [self.play(int(input(f'Carte n°{k + 1} à donner'))) for k in range(3)]
 
     def my_turn(self, trump, first, heart):
@@ -66,6 +66,9 @@ class DameDePique:
 
     async def autoplay(self, player, card):
         print(f'{player.name} a joué {card}')
+
+    async def swap(self, messages):
+        return [player.swap(msg) for player, msg in zip(self.players, messages)]
 
     def deal(self):
         random.shuffle(self.cards)
@@ -115,7 +118,7 @@ class DameDePique:
     async def swap_cards(self, mod):
         await self.tell_everyone(', '.join([player.name for player in self.players]), 'Échangez vos cartes')
         swaps = [await player.ask_swap() for player in self.players]
-        give = [await player.swap(self.everyone, swap) for player, swap in zip(self.players, swaps)]
+        give = await self.swap(swaps)
         for p, player in enumerate(self.players):
             await player.give(self.players[(p + self.r_corresp[mod]) % 4], give[p])
         for player in self.players:

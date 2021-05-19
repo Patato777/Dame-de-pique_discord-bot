@@ -54,25 +54,6 @@ class Player(dame_de_pique.Player):
             await msg.add_reaction(emote)
         return msg
 
-    async def swap(self, everyone, msg):
-        def check(r, u):
-            return r.message == msg and u == self.user and r.count == 2
-
-        swap = list()
-        cards_list = [card.__repr__() for card in self.cards]
-        while len(swap) < 3:
-            reaction, _ = await bot.wait_for('reaction_add', check=check)
-            swap = list()
-            for reaction in msg.reactions:
-                if reaction.count == 2:
-                    emote = reaction.emoji.name if reaction.custom_emoji else reaction.emoji
-                    swap.append(cards_list.index(REACTIONS_CARDS[emote]))
-        await msg.delete()
-        embed = everyone.embeds[0]
-        embed.description = embed.description.replace(self.name + ', ', '').replace(self.name, '')
-        await everyone.edit(embed=embed)
-        return swap
-
     async def my_turn(self, trump, first, heart):
         cards_list = [card.__repr__() for card in self.cards]
 
@@ -122,6 +103,45 @@ class DameDePique(dame_de_pique.DameDePique):
                                                                        overwrites=overwrites)
             embed = discord.Embed(title='Mes cartes', description='')
             player.cards_msg = await player.private_chan.send(embed=embed)
+
+    async def swap(self, messages):
+        def check(react, u):
+            return react.message in messages and u != bot.user and react.count == 2
+
+        give = [list() for _ in range(4)]
+        for index, (player, msg) in enumerate(zip(self.players, messages)):
+            swaps = await self.count_reactions(player, await msg.channel.fetch_message(msg.id))
+            if len(swaps) >= 3:
+                give[index] = swaps[:3]
+        while list() in give:
+            reaction, _ = await bot.wait_for('reaction_add', check=check)
+            msg = reaction.message
+            index = messages.index(msg)
+            player = self.players[index]
+            swaps = await self.count_reactions(player, msg)
+            if len(swaps) == 3:
+                give[index] = swaps
+            elif len(swaps) > 3:
+                reaction.remove(player.user)
+        for msg in messages:
+            await msg.delete()
+        return give
+
+    async def count_reactions(self, player, msg):
+        cards_list = [card.__repr__() for card in player.cards]
+        swaps = list()
+        for r in msg.reactions:
+            if r.count == 2:
+                emote = r.emoji.name if r.custom_emoji else r.emoji
+                swaps.append(cards_list.index(REACTIONS_CARDS[emote]))
+        if len(swaps) >= 3:
+            embed = self.everyone.embeds[0]
+            try:
+                embed.description = embed.description.replace(player.name + ', ', '').replace(player.name, '')
+            except AttributeError:
+                pass
+            await self.everyone.edit(embed=embed)
+        return swaps
 
     async def say(self, string):
         await self.chan.send(string)
