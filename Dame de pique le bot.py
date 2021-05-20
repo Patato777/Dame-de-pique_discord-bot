@@ -1,5 +1,6 @@
 import asyncio
 import re
+import traceback
 
 import discord
 import emoji
@@ -234,6 +235,30 @@ async def on_message(msg):
             await msg.channel.send('Plaît-il ?')
     elif msg.content.startswith('!') and msg.content[1:] in COMMANDS:
         await COMMANDS[msg.content[1:]](msg.channel)
+
+
+@bot.event
+async def on_error(event):
+    cat_channels = discord.utils.get(bot.get_all_channels(), name='Ma main', type='category')
+    for cat in cat_channels:
+        for chan in cat:
+            try:
+                role = [key for key, value in chan.overwrites.items() if
+                        key != chan.guild.me and value == discord.PermissionOverwrite(read_messages=True)][0]
+            except IndexError:
+                pass
+            else:
+                try:
+                    await role.delete()
+                    await chan.delete()
+                except discord.Forbidden:
+                    pass
+        try:
+            await cat.delete()
+        except discord.Forbidden:
+            pass
+    print('Ignoring exception in {}'.format(event), file=sys.stderr)
+    traceback.print_exc()
 
 
 token = input('Token : ')
