@@ -175,21 +175,14 @@ async def ddp(chan):
     def check(r, u):
         return r.message == msg and str(r.emoji) in ('❌', '♠') and u != bot.user
 
-    timeout = False
-    while s_count < 4 and reaction.emoji != '❌' and not timeout:
-        try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
-        except asyncio.TimeoutError:
-            timeout = True
-            embed.description = 'Temps écoulé, annulation...'
+    while s_count < 4 and reaction.emoji != '❌':
+        reaction, user = await bot.wait_for('reaction_add', check=check)
+        if reaction.emoji == '♠':
+            players.append(user)
+            s_count += 1
+        elif reaction.emoji == '❌':
+            embed.description = 'Annulation...'
             await msg.edit(embed=embed)
-        else:
-            if reaction.emoji == '♠':
-                players.append(user)
-                s_count += 1
-            else:
-                embed.description = 'Annulation...'
-                await msg.edit(embed=embed)
     await msg.clear_reactions()
     if s_count == 4:
         desc = f'Joueuses et joueurs : {", ".join([p.mention for p in players])}'
