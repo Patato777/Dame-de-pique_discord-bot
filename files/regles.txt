@@ -1,0 +1,21 @@
+Règles de la Dame de Pique
+**But**
+La __Dame de Pique__ est un jeu de plis où le but est d'avoir le moins de points possible.
+
+**Déroulement d'une manche**
+Avant certaines manches *(3 sur 4)*, on vous demandera de sélectionner trois cartes de votre jeu qui seront données à un autre joueur et ajoutées à son jeu. Donnez celles que vous ne voulez pas garder !
+
+Ensuite, c'est toujours le joueur qui a le `2 de trèfle` qui entame, par ce `2 de trèfle`. Lors du premier tour aucun joueur ne peut poser une carte qui vaut des points, c’est-à-dire du `cœur` ou la `Dame de Pique`.
+Les plis se déroulent ensuite, la carte la plus forte étant l'`As`, la plus faible, le `2`. 
+Il est interdit d'entamer un pli avec du `cœur` si aucun joueur n’a encore posé du `cœur` lors d’un tour précédent. Le premier `cœur` joué sera donc nécessairement défaussé. 
+
+**Les points**
+C'est dans les plis par chaque joueur que sont comptés les points :
+- La dame de pique vaut *13 points*.
+- Chaque cœur vaut *1 point*.
+Néanmoins, si un joueur possède à la fin de la manche tous les cœurs et la dame de pique (toutes les cartes valant des points), il marque *0 point* et les trois autres joueurs marquent *26 points* chacun. 
+On appelle ça un __Grand Chelem__.
+
+La partie se termine lorsque au moins un des joueurs a atteint un total de *100 points*. Le gagnant est alors celui qui a le moins de points.
+
+Bon jeu !

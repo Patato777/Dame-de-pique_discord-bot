@@ -125,7 +125,15 @@ async def man(chan):
     await chan.send(embed=embed)
 
 
-COMMANDS = {'man': man, 'ddp': ddp}
+async def regles(chan):
+    with open('files/regles.txt', 'r', encoding='utf-8') as f:
+        title = f.readline()
+        text = f.read()
+    embed = discord.Embed(type='rich', title=title, description=text)
+    await chan.send(embed=embed)
+    
+    
+COMMANDS = {'man': man, 'ddp': ddp, 'règles': regles}
 
 
 # @bot.event
