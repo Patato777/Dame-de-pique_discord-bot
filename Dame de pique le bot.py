@@ -1,6 +1,7 @@
 import asyncio
 import re
 import traceback
+import sys
 
 import discord
 import emoji
@@ -19,9 +20,8 @@ REACTIONS_CARDS = {value: key for key, value in {**CARDS_REACTIONS, **CARDS_DEF_
 
 
 def get_emojis(m):
-    custom = re.findall(r'<(?P<name>:\w*:)(?P<id>\d*)', m.content)
-    unicode = list(map(lambda e: (emoji.UNICODE_EMOJI_ENGLISH[e], ''),
-                       filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH.keys(), list(m.content))))
+    custom = re.findall(r'<:(?P<name>\w*):\d*', m.content)
+    unicode = list(filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH, m.content))
     return custom + unicode
 
 
@@ -58,21 +58,21 @@ class Player(dame_de_pique.Player):
     async def my_turn(self, trump, first, heart):
         cards_list = [card.__repr__() for card in self.cards]
 
-        async def check(m):
+        def check(m):
             emojis = get_emojis(m)
-            if m.author == self.user and len(emojis) == 1 and REACTIONS_CARDS[emojis[0][1:-1]] in cards_list:
-                card = self.cards[cards_list.index(emojis[0])]
-                if first and (card.color != 'Coeur' or heart):
-
-                    return True
-                elif card.color == trump or trump not in [c.color for c in self.cards]:
-                    return True
-            await m.delete()
+            if m.author == self.user and len(emojis) == 1:
+                e = emojis[0]
+                if e in REACTIONS_CARDS and REACTIONS_CARDS[e] in cards_list:
+                    card = self.cards[cards_list.index(REACTIONS_CARDS[e])]
+                    if first and (card.color != 'Coeur' or heart):
+                        return True
+                    elif card.color == trump or trump not in [c.color for c in self.cards]:
+                        return True
             return False
 
-        msg = await bot.wait_for('message', check=await check)
+        msg = await bot.wait_for('message', check=check)
         await msg.add_reaction('✅')
-        return cards_list.index(REACTIONS_CARDS[get_emojis(msg)[0][0][1:-1]])
+        return cards_list.index(REACTIONS_CARDS[get_emojis(msg)[0]])
 
 
 class DameDePique(dame_de_pique.DameDePique):
@@ -123,7 +123,7 @@ class DameDePique(dame_de_pique.DameDePique):
             if len(swaps) == 3:
                 give[index] = swaps
             elif len(swaps) > 3:
-                reaction.remove(player.user)
+                await reaction.remove(player.user)
         for msg in messages:
             await msg.delete()
         return give
@@ -138,7 +138,7 @@ class DameDePique(dame_de_pique.DameDePique):
         if len(swaps) >= 3:
             embed = self.everyone.embeds[0]
             try:
-                embed.description = embed.description.replace(player.name + ', ', '').replace(player.name, '')
+                embed.description = embed.description.replace(player.name, '')
             except AttributeError:
                 pass
             await self.everyone.edit(embed=embed)
@@ -238,25 +238,26 @@ async def on_message(msg):
 
 
 @bot.event
-async def on_error(event):
-    cat_channels = discord.utils.get(bot.get_all_channels(), name='Ma main', type='category')
-    for cat in cat_channels:
-        for chan in cat:
-            try:
-                role = [key for key, value in chan.overwrites.items() if
-                        key != chan.guild.me and value == discord.PermissionOverwrite(read_messages=True)][0]
-            except IndexError:
-                pass
-            else:
-                try:
-                    await role.delete()
-                    await chan.delete()
-                except discord.Forbidden:
-                    pass
-        try:
-            await cat.delete()
-        except discord.Forbidden:
-            pass
+async def on_error(event, *args, **kwargs):
+    await bot.get_channel(843959026362351648).send(f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
+    # cat_channels = discord.utils.get(bot.get_all_channels(), name='MA MAIN')
+    # for cat in cat_channels:
+    #     for chan in cat:
+    #         try:
+    #             role = [key for key, value in chan.overwrites.items() if
+    #                     key != chan.guild.me and value == discord.PermissionOverwrite(read_messages=True)][0]
+    #         except IndexError:
+    #             pass
+    #         else:
+    #             try:
+    #                 await role.delete()
+    #                 await chan.delete()
+    #             except discord.Forbidden:
+    #                 pass
+    #     try:
+    #         await cat.delete()
+    #     except discord.Forbidden:
+    #         pass
     print('Ignoring exception in {}'.format(event), file=sys.stderr)
     traceback.print_exc()
 

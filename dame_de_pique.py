@@ -10,7 +10,7 @@ class Card:
         self.id = card
         self.color = self.corresp['color'][self.id[0]]
         self.value = self.corresp['value'][self.id[1]]
-        self.points = {'Coeur': 1}.get(self.color, 0) if self.id != (1, 12) else 10
+        self.points = {'Coeur': 1}.get(self.color, 0) if self.id != (2, 11) else 13
 
     def __repr__(self):
         return ' de '.join([self.corresp['value'][self.id[1]], self.corresp['color'][self.id[0]]])
@@ -116,7 +116,7 @@ class DameDePique:
         self.players = [self.players[k % 4] for k in range(first, first + 4)]
 
     async def swap_cards(self, mod):
-        await self.tell_everyone(', '.join([player.name for player in self.players]), 'Échangez vos cartes')
+        await self.tell_everyone(' '.join([player.name for player in self.players]), 'Échangez vos cartes')
         swaps = [await player.ask_swap() for player in self.players]
         give = await self.swap(swaps)
         for p, player in enumerate(self.players):
@@ -152,7 +152,7 @@ class DameDePique:
             fold = await self.player_turn(player, fold)
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
-        await self.tell_everyone('', f'{self.players[winner].name} remporte le pli')
+        await self.tell_everyone(f'{self.players[winner].name} remporte le pli', 'Fin du pli')
         if 'Coeur' in [card.color for card in fold]:
             self.heart = True
         return winner
