@@ -1,7 +1,7 @@
 import asyncio
 import re
-import traceback
 import sys
+import traceback
 
 import discord
 import emoji
@@ -242,7 +242,8 @@ async def on_message(msg):
 
 @bot.event
 async def on_error(event, *args, **kwargs):
-    await bot.get_channel(843959026362351648).send(f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
+    await bot.get_channel(843959026362351648).send(
+        f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
     # cat_channels = discord.utils.get(bot.get_all_channels(), name='MA MAIN')
     # for cat in cat_channels:
     #     for chan in cat:
