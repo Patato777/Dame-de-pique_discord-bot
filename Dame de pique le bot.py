@@ -10,11 +10,14 @@ import dame_de_pique
 
 bot = discord.Client(intents=discord.Intents.all())
 
-CARDS_REACTIONS = {f'{k} de {couleur}': f"{str(k).lower()}_de_{couleur.lower().replace('è', '')}" for k in
-                   list(range(2, 11)) + ['Valet', 'Dame', 'Roi'] for couleur in ['Coeur', 'Pique', 'Trèfle', 'Carreau']}
-CARDS_DEF_REACTIONS = {'As de Trèfle': emoji.EMOJI_UNICODE_ENGLISH[':club_suit:'],
-                       'As de Pique': emoji.EMOJI_UNICODE_ENGLISH[':spade_suit:'],
-                       'As de Carreau': emoji.EMOJI_UNICODE_ENGLISH[':diamond_suit:'],
+LOW_CARDS_REACTIONS = {f'{k} de {couleur}': f"{str(k).lower()}{couleur.lower().replace('è', '')}" for k in
+                       list(range(2, 11)) for couleur in ['Coeur', 'Pique', 'Trèfle', 'Carreau']}
+HIGH_CARDS_REACTIONS = {f'{val} de {couleur}': f"{val[0]}{couleur.lower().replace('è', '')}" for val in
+                        ['Valet', 'Dame', 'Roi', 'As'] for couleur in ['Coeur', 'Pique', 'Trèfle', 'Carreau'] if
+                        not (val == 'As' and couleur in ['Coeur', 'Carreau'])}
+CARDS_REACTIONS = {**LOW_CARDS_REACTIONS, **HIGH_CARDS_REACTIONS}
+
+CARDS_DEF_REACTIONS = {'As de Carreau': emoji.EMOJI_UNICODE_ENGLISH[':diamond_suit:'],
                        'As de Coeur': emoji.EMOJI_UNICODE_ENGLISH[':heart_suit:']}
 REACTIONS_CARDS = {value: key for key, value in {**CARDS_REACTIONS, **CARDS_DEF_REACTIONS}.items()}
 
