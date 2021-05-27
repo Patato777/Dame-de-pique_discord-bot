@@ -10,7 +10,7 @@ class Card:
         self.id = card
         self.color = self.corresp['color'][self.id[0]]
         self.value = self.corresp['value'][self.id[1]]
-        self.points = {'Coeur': 1}.get(self.color, 0) if self.id != (1, 12) else 10
+        self.points = {'Coeur': 1}.get(self.color, 0) if self.id != (2, 11) else 13
 
     def __repr__(self):
         return ' de '.join([self.corresp['value'][self.id[1]], self.corresp['color'][self.id[0]]])
@@ -29,6 +29,13 @@ class Player:
     def play(self, card):
         return self.cards.pop(card)
 
+    def swap(self, _):
+        return [self.play(int(input(f'Carte n°{k + 1} à donner'))) for k in range(3)]
+
+    def my_turn(self, trump, first, heart):
+        print(self.name)
+        return int(input(my_cards + '\n' + f'(plus petit que {len(self.cards)})' + prompt))
+
     async def give(self, player, cards):
         cards = [self.cards[c] for c in cards]
         for card in cards:
@@ -40,10 +47,6 @@ class Player:
     def say(self, string):
         print(string)
 
-    def ask(self, prompt, count=1, cond=lambda c: True):
-        print(self.name)
-        return input(my_cards + '\n' + f'(plus petit que {len(self.cards)})' + prompt)
-
 
 class DameDePique:
     r_corresp = {1: 1, 2: 3, 3: 2}
@@ -53,12 +56,19 @@ class DameDePique:
         self.players = [Player(f'Joueur {k}') for k in range(4)]
         self.heart = False
         self.round = 0
+        self.everyone = str()
 
-    def tell_everyone(self, string):
+    async def say(self, string):
         print(string)
 
-    def add_to_everyone(self, string):
+    def tell_everyone(self, string, title='Dame de Pique'):
         print(string)
+
+    async def autoplay(self, player, card):
+        print(f'{player.name} a joué {card}')
+
+    async def swap(self, messages):
+        return [player.swap(msg) for player, msg in zip(self.players, messages)]
 
     def deal(self):
         random.shuffle(self.cards)
@@ -72,7 +82,8 @@ class DameDePique:
         else:
             for player in self.players:
                 player.points += player.r_points
-                await player.say(f'Tu as {player.points} points')
+        await self.tell_everyone('\n'.join([f'{player.name}: {player.points} points' for player in self.players]),
+                                 'Points')
 
     async def play(self):
         self.round += 1
@@ -95,53 +106,53 @@ class DameDePique:
         if max([player.points for player in self.players]) < 100:
             await self.play()
         else:
-            await self.tell_everyone('Fin de la partie !\nClassement :\n')
-            for p, player in enumerate(sorted(self.players, key=lambda p: p.points)):
-                await self.tell_everyone(f'{p}. {player.name} ({player.points})')
+            await self.tell_everyone('', 'Fin de la partie !')
+            classement = [f'{p}. {player.name} ({player.points})' for p, player in
+                          enumerate(sorted(self.players, key=lambda p: p.points))]
+            await self.tell_everyone('\n'.join(classement), 'Classement ')
+            await self.end()
 
     def sort_players(self, first):
         self.players = [self.players[k % 4] for k in range(first, first + 4)]
 
     async def swap_cards(self, mod):
-        give = await self.ask_everyone('3 cartes à échanger avec son voisin', count=3)
+        await self.tell_everyone(' '.join([player.name for player in self.players]), 'Échangez vos cartes')
+        swaps = [await player.ask_swap() for player in self.players]
+        give = await self.swap(swaps)
         for p, player in enumerate(self.players):
             await player.give(self.players[(p + self.r_corresp[mod]) % 4], give[p])
-        await self.tell_everyone('Les cartes ont été échangées')
         for player in self.players:
             await player.my_cards()
 
     async def player_turn(self, player, fold):
         trump = fold[0].color
-        play = await player.ask('A toi de jouer : ', count=1,
-                                cond=lambda c: player.cards[c].color != trump and trump in [card.color for card in
-                                                                                            player.cards])[0]
+        play = await player.my_turn(trump, False, self.heart)
         fold.append(player.play(play))
         await player.my_cards()
-        await self.add_to_everyone(f'{player.name} a joué : {fold[-1]}')
         return fold
 
     async def first_player_turn(self):
-        play = awaitself.players[0].ask('Tu commences : ', count=1,
-                                        cond=lambda c: self.players[0].cards[c].color == 'Coeur' and not self.heart)[0]
+        play = await self.players[0].my_turn(None, True, self.heart)
         card = self.players[0].play(play)
-        await self.add_to_everyone(f'{self.players[0].name} a joué : {card}')
         return card
 
     async def play_turn(self, turn):
-        await self.tell_everyone('Nouveau pli')
+        await self.tell_everyone('', 'Nouveau pli')
         if turn == 1:
             de_2_trefle = [c for c, card in enumerate(self.players[0].cards) if card.__repr__() == '2 de Trèfle'][0]
             fold = [self.players[0].play(de_2_trefle)]
-            await self.add_to_everyone(f'{self.players[0].name} a entamé avec un 2 de Trèfle')
+            await self.autoplay(self.players[0], '2 de Trèfle')
         else:
+            await self.say(f'A {self.players[0].name} de jouer')
             fold = [await self.first_player_turn()]
         await self.players[0].my_cards()
         trump = fold[0].color
         for player in self.players[1:]:
+            await self.say(f'A {player.name} de jouer')
             fold = await self.player_turn(player, fold)
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
-        await self.tell_everyone(f'{self.players[winner].name} remporte le pli')
+        await self.tell_everyone(f'{self.players[winner].name} remporte le pli', 'Fin du pli')
         if 'Coeur' in [card.color for card in fold]:
             self.heart = True
         return winner
@@ -151,7 +162,10 @@ class DameDePique:
         trump = fold[0].color
         for card, player in zip(fold, self.players):
             await player.my_cards()
-            await self.add_to_everyone(f'{player.name} a joué : {card}')
+            await self.autoplay(player, card.__repr__())
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
-        await self.tell_everyone(f'{self.players[winner].name} remporte le pli')
+        await self.tell_everyone('', f'{self.players[winner].name} remporte le pli')
+
+    async def end(self):
+        pass

@@ -1,13 +1,28 @@
 import asyncio
+import re
+import traceback
+import sys
 
 import discord
+import emoji
 
 import dame_de_pique
 
-bot = discord.Client()
+bot = discord.Client(intents=discord.Intents.all())
 
-COUNT = ['0️⃣', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟']
-COUNT_TRAD = {emoji: e for e, emoji in enumerate(COUNT)}
+CARDS_REACTIONS = {f'{k} de {couleur}': f"{str(k).lower()}_de_{couleur.lower().replace('è', '')}" for k in
+                   list(range(2, 11)) + ['Valet', 'Dame', 'Roi'] for couleur in ['Coeur', 'Pique', 'Trèfle', 'Carreau']}
+CARDS_DEF_REACTIONS = {'As de Trèfle': emoji.EMOJI_UNICODE_ENGLISH[':club_suit:'],
+                       'As de Pique': emoji.EMOJI_UNICODE_ENGLISH[':spade_suit:'],
+                       'As de Carreau': emoji.EMOJI_UNICODE_ENGLISH[':diamond_suit:'],
+                       'As de Coeur': emoji.EMOJI_UNICODE_ENGLISH[':heart_suit:']}
+REACTIONS_CARDS = {value: key for key, value in {**CARDS_REACTIONS, **CARDS_DEF_REACTIONS}.items()}
+
+
+def get_emojis(m):
+    custom = re.findall(r'<:(?P<name>\w*):\d*', m.content)
+    unicode = list(filter(lambda l: l in emoji.UNICODE_EMOJI_ENGLISH, m.content))
+    return custom + unicode
 
 
 class Player(dame_de_pique.Player):
@@ -21,7 +36,7 @@ class Player(dame_de_pique.Player):
 
     async def my_cards(self):
         self.cards.sort()
-        hand = '\n'.join([f'{c + 1}. {card}' for c, card in enumerate(self.cards)])
+        hand = '\n'.join([f'{self.emotes[card.__repr__()]} : {card}' for c, card in enumerate(self.cards)])
         self.cards_msg.embeds[0].description = hand
         await self.cards_msg.edit(embed=self.cards_msg.embeds[0])
 
@@ -29,54 +44,124 @@ class Player(dame_de_pique.Player):
         embed = discord.Embed(title=title, description=string)
         return await self.chan.send(embed=embed)
 
-    async def dm_say(self, string, title='Dame de pique'):
-        embed = discord.Embed(title=title, description=string)
-        return await self.user.send(embed=embed)
+    async def ask_swap(self):
+        embed = discord.Embed(title='Échanger des cartes', description='Choisissez 3 cartes à échanger')
+        msg = await self.private_chan.send(embed=embed)
+        for card in self.cards:
+            if card.__repr__() in self.emotes:
+                emote = self.emotes[card.__repr__()]
+            else:
+                emote = CARDS_DEF_REACTIONS[card.__repr__()]
+            await msg.add_reaction(emote)
+        return msg
 
-    async def ask(self, prompt, count=1, cond=lambda c: True, base_msg=None):
-        if base_msg is None:
-            await self.say(self.user.mention, title=prompt)
+    async def my_turn(self, trump, first, heart):
+        cards_list = [card.__repr__() for card in self.cards]
 
         def check(m):
-            try:
-                ans = set([int(n) - 1 for n in m.content.split(', ')])
-            except ValueError:
-                return False
-            return m.author == self.user and len(ans) == count and all(
-                [c in range(len(self.cards)) for c in ans]) and all([cond(self.cards[c]) for c in ans])
+            emojis = get_emojis(m)
+            if m.author == self.user and len(emojis) == 1:
+                e = emojis[0]
+                if e in REACTIONS_CARDS and REACTIONS_CARDS[e] in cards_list:
+                    card = self.cards[cards_list.index(REACTIONS_CARDS[e])]
+                    if first and (card.color != 'Coeur' or heart):
+                        return True
+                    elif card.color == trump or trump not in [c.color for c in self.cards]:
+                        return True
+            return False
 
         msg = await bot.wait_for('message', check=check)
-        content = msg.content
-        if base_msg is not None:
-            embed = base_msg.embeds[0]
-            embed.description = embed.description.replace(self.user.mention, '').replace(', ,', '')
-            await base_msg.edit(embed=embed)
-        await msg.delete()
-        return list(set([int(n) - 1 for n in content.split(', ')]))
+        await msg.add_reaction('✅')
+        return cards_list.index(REACTIONS_CARDS[get_emojis(msg)[0]])
 
 
 class DameDePique(dame_de_pique.DameDePique):
     def __init__(self, chan, players):
         self.chan = chan
+        self.guild = chan.guild
         self.cards = [dame_de_pique.Card((col, val)) for col in range(4) for val in range(1, 14)]
         self.players = [Player(player, self.chan) for player in players]
         self.heart = False
         self.round = 0
-        self.everyone = None
+        self.everyone = str()
+        c_emotes = {name: discord.utils.get(self.guild.emojis, name=card) for name, card in CARDS_REACTIONS.items()}
+        self.emotes = {**c_emotes, **CARDS_DEF_REACTIONS}
+        for player in self.players:
+            player.emotes = self.emotes
 
-    async def tell_everyone(self, string):
-        embed = discord.Embed(title='Dame de pique', description=string)
+    async def setup(self):
+        category = await self.guild.create_category('Ma main')
+        for player in self.players:
+            player.role = await self.guild.create_role(name=player.user.name,
+                                                       permissions=self.guild.default_role.permissions)
+            await self.guild.get_member(player.user.id).add_roles(player.role)
+            overwrites = {
+                self.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                self.guild.me: discord.PermissionOverwrite(read_messages=True),
+                player.role: discord.PermissionOverwrite(read_messages=True)
+            }
+            player.private_chan = await self.guild.create_text_channel(player.user.name, category=category,
+                                                                       overwrites=overwrites)
+            embed = discord.Embed(title='Mes cartes', description='')
+            player.cards_msg = await player.private_chan.send(embed=embed)
+
+    async def swap(self, messages):
+        def check(react, u):
+            return react.message in messages and u != bot.user and react.count == 2
+
+        give = [list() for _ in range(4)]
+        for index, (player, msg) in enumerate(zip(self.players, messages)):
+            swaps = await self.count_reactions(player, await msg.channel.fetch_message(msg.id))
+            if len(swaps) >= 3:
+                give[index] = swaps[:3]
+        while list() in give:
+            reaction, _ = await bot.wait_for('reaction_add', check=check)
+            msg = reaction.message
+            index = messages.index(msg)
+            player = self.players[index]
+            swaps = await self.count_reactions(player, msg)
+            if len(swaps) == 3:
+                give[index] = swaps
+            elif len(swaps) > 3:
+                await reaction.remove(player.user)
+        for msg in messages:
+            await msg.delete()
+        return give
+
+    async def count_reactions(self, player, msg):
+        cards_list = [card.__repr__() for card in player.cards]
+        swaps = list()
+        for r in msg.reactions:
+            if r.count == 2:
+                emote = r.emoji.name if r.custom_emoji else r.emoji
+                swaps.append(cards_list.index(REACTIONS_CARDS[emote]))
+        if len(swaps) >= 3:
+            embed = self.everyone.embeds[0]
+            try:
+                embed.description = embed.description.replace(player.name, '')
+            except AttributeError:
+                pass
+            await self.everyone.edit(embed=embed)
+        return swaps
+
+    async def say(self, string):
+        await self.chan.send(string)
+
+    async def tell_everyone(self, string, title='Dame de pique'):
+        embed = discord.Embed(title=title, description=string)
         self.everyone = await self.chan.send(embed=embed)
 
-    async def ask_everyone(self, prompt, count=3):
-        embed = discord.Embed(title=prompt, description=f'{", ".join([player.user.mention for player in self.players])}')
-        msg = await self.chan.send(embed=embed)
-        for player in self.players:
-            await player.ask(prompt, count=3, base_msg=msg)
+    async def autoplay(self, player, card):
+        emote = self.emotes[card] if card in self.emotes else CARDS_DEF_REACTIONS[card]
+        embed = discord.Embed(title=player.user.name, description=emote)
+        await self.chan.send(embed=embed)
 
-    async def add_to_everyone(self, string):
-        self.everyone.embeds[0].description += f'\n{string}'
-        await self.everyone.edit(embed=self.everyone.embeds[0])
+    async def end(self):
+        for player in self.players:
+            category = player.private_chan.category
+            await player.private_chan.delete()
+            await player.role.delete()
+        await category.delete()
 
 
 async def ddp(chan):
@@ -88,33 +173,25 @@ async def ddp(chan):
     s_count, players = 0, list()
     reaction = discord.Reaction(message=None, data={}, emoji=True)
 
-    def check(reaction, user):
-        return str(reaction.emoji) in ('❌', '♠') and user != bot.user
+    def check(r, u):
+        return r.message == msg and str(r.emoji) in ('❌', '♠') and u != bot.user
 
-    timeout = False
-    while s_count < 4 and reaction.emoji != '❌' and not timeout:
-        try:
-            reaction, user = await bot.wait_for('reaction_add', timeout=60.0, check=check)
-        except asyncio.TimeoutError:
-            timeout = True
-            embed.description = 'Temps écoulé, annulation...'
+    while s_count < 4 and reaction.emoji != '❌':
+        reaction, user = await bot.wait_for('reaction_add', check=check)
+        if reaction.emoji == '♠':
+            players.append(user)
+            s_count += 1
+        elif reaction.emoji == '❌':
+            embed.description = 'Annulation...'
             await msg.edit(embed=embed)
-        else:
-            if reaction.emoji == '♠':
-                players.append(user)
-                s_count += 1
-            else:
-                embed.description = 'Annulation...'
-                await msg.edit(embed=embed)
     await msg.clear_reactions()
     if s_count == 4:
         desc = f'Joueuses et joueurs : {", ".join([p.mention for p in players])}'
         embed = discord.Embed(title="C'est parti !", description=desc)
         await chan.send(embed=embed)
-    ddp = DameDePique(chan, players)
-    for player in ddp.players:
-        player.cards_msg = await player.dm_say('', 'Mes cartes')
-    await ddp.play()
+        d2p = DameDePique(chan, players)
+        await d2p.setup()
+        await d2p.play()
 
 
 async def man(chan):
@@ -125,20 +202,29 @@ async def man(chan):
     await chan.send(embed=embed)
 
 
+async def test(chan):
+    def check(m):
+        return m.channel == chan
+
+    msg = await chan.send('Foo')
+    await msg.add_reaction('<:Kappa:673530124259426304>')
+    r, _ = await bot.wait_for('reaction_add')
+    print(r.message.reactions == msg.reactions)
+    for _ in range(50):
+        await asyncio.sleep(1)
+        print(msg.reactions)
+
+
 async def regles(chan):
     with open('files/regles.txt', 'r', encoding='utf-8') as f:
         title = f.readline()
         text = f.read()
     embed = discord.Embed(type='rich', title=title, description=text)
     await chan.send(embed=embed)
-    
-    
-COMMANDS = {'man': man, 'ddp': ddp, 'règles': regles}
 
 
-# @bot.event
-# async def on_ready():
-#    await bot.get_channel(841820253008166912).send('Bonjour ! :wave: :blush:')
+COMMANDS = {'man': man, 'ddp': ddp, 'test': test, 'règles': regles}
+
 
 @bot.event
 async def on_message(msg):
@@ -149,6 +235,32 @@ async def on_message(msg):
             await msg.channel.send('Plaît-il ?')
     elif msg.content.startswith('!') and msg.content[1:] in COMMANDS:
         await COMMANDS[msg.content[1:]](msg.channel)
+
+
+@bot.event
+async def on_error(event, *args, **kwargs):
+    await bot.get_channel(843959026362351648).send(f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
+    # cat_channels = discord.utils.get(bot.get_all_channels(), name='MA MAIN')
+    # for cat in cat_channels:
+    #     for chan in cat:
+    #         try:
+    #             role = [key for key, value in chan.overwrites.items() if
+    #                     key != chan.guild.me and value == discord.PermissionOverwrite(read_messages=True)][0]
+    #         except IndexError:
+    #             pass
+    #         else:
+    #             try:
+    #                 await role.delete()
+    #                 await chan.delete()
+    #             except discord.Forbidden:
+    #                 pass
+    #     try:
+    #         await cat.delete()
+    #     except discord.Forbidden:
+    #         pass
+    print('Ignoring exception in {}'.format(event), file=sys.stderr)
+    traceback.print_exc()
+
 
 token = input('Token : ')
 bot.run(token)
