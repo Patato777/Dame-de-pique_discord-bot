@@ -244,7 +244,7 @@ async def on_message(msg):
 @bot.event
 async def on_error(event, *args, **kwargs):
     await bot.get_channel(843959026362351648).send(
-        f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
+					f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())[:1950]}```')
     print('Ignoring exception in {}'.format(event), file=sys.stderr)
     traceback.print_exc()
 
