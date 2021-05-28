@@ -70,7 +70,7 @@ class Player(dame_de_pique.Player):
                     if first and (card.color != 'Coeur' or heart):
                         return True
                     elif (card.color == trump or trump not in [c.color for c in self.cards]) and not (
-                            card.__repr__() == 'Dame de Pique' and len(self.cards) == 13):
+                           (card.color == 'Coeur' or card.__repr__() == 'Dame de Pique') and len(self.cards) == 13):
                         return True
             return False
 
