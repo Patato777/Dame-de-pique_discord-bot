@@ -49,8 +49,6 @@ class Player:
 
 
 class DameDePique:
-    r_corresp = {1: 1, 2: 3, 3: 2}
-
     def __init__(self):
         self.cards = [Card((col, val)) for col in range(4) for val in range(1, 14)]
         self.players = [Player(f'Joueur {k}') for k in range(4)]
@@ -116,11 +114,12 @@ class DameDePique:
         self.players = [self.players[k % 4] for k in range(first, first + 4)]
 
     async def swap_cards(self, mod):
+        convert = {1: 1, 2: 3, 3: 2}
         await self.tell_everyone(' '.join([player.name for player in self.players]), 'Échangez vos cartes')
-        swaps = [await player.ask_swap() for player in self.players]
+        swaps = [await player.ask_swap(self.players[(p + convert[mod]) % 4]) for p, player in enumerate(self.players)]
         give = await self.swap(swaps)
         for p, player in enumerate(self.players):
-            await player.give(self.players[(p + self.r_corresp[mod]) % 4], give[p])
+            await player.give(self.players[(p + convert[mod]) % 4], give[p])
         for player in self.players:
             await player.my_cards()
 

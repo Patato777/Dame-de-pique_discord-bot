@@ -47,8 +47,8 @@ class Player(dame_de_pique.Player):
         embed = discord.Embed(title=title, description=string)
         return await self.chan.send(embed=embed)
 
-    async def ask_swap(self):
-        embed = discord.Embed(title='Échanger des cartes', description='Choisissez 3 cartes à échanger')
+    async def ask_swap(self, target):
+        embed = discord.Embed(title='Échanger des cartes', description=f'Choisissez 3 cartes à donner à {target.name}')
         msg = await self.private_chan.send(embed=embed)
         for card in self.cards:
             if card.__repr__() in self.emotes:
