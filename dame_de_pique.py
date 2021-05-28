@@ -164,7 +164,7 @@ class DameDePique:
             await self.autoplay(player, card.__repr__())
         winner = fold.index(sorted(filter(lambda c: c.color == trump, fold))[-1])
         self.players[winner].r_points += sum([card.points for card in fold])
-        await self.tell_everyone('', f'{self.players[winner].name} remporte le pli')
+        await self.tell_everyone(f'{self.players[winner].name} remporte le pli', 'Fin du pli')
 
     async def end(self):
         pass
