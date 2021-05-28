@@ -244,24 +244,6 @@ async def on_message(msg):
 async def on_error(event, *args, **kwargs):
     await bot.get_channel(843959026362351648).send(
         f'Planté : ```Python\n{traceback.format_exception(*sys.exc_info())}```')
-    # cat_channels = discord.utils.get(bot.get_all_channels(), name='MA MAIN')
-    # for cat in cat_channels:
-    #     for chan in cat:
-    #         try:
-    #             role = [key for key, value in chan.overwrites.items() if
-    #                     key != chan.guild.me and value == discord.PermissionOverwrite(read_messages=True)][0]
-    #         except IndexError:
-    #             pass
-    #         else:
-    #             try:
-    #                 await role.delete()
-    #                 await chan.delete()
-    #             except discord.Forbidden:
-    #                 pass
-    #     try:
-    #         await cat.delete()
-    #     except discord.Forbidden:
-    #         pass
     print('Ignoring exception in {}'.format(event), file=sys.stderr)
     traceback.print_exc()
 
